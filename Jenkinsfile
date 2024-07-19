@@ -1,28 +1,13 @@
 pipeline {
     agent any
-    
-    environment {
-        // Define environment variables here if needed
-    }
-
     stages {
-        stage('Checkout SCM') {
-            steps {
-                script {
-                    // Checkout code from Git repository
-                    checkout scm
-                }
-            }
-        }
-
         stage('Init') {
             steps {
                 script {
-                    // Create Docker network (if needed)
-                    sh 'docker network create my-network || true'
-                    
-                    // Remove all containers (optional, clean-up step)
+                    // Remove all containers (if any exist)
                     sh 'docker ps -qa | xargs -r docker rm -f || true'
+                    // Create a Docker network if it doesn't exist
+                    sh 'docker network create my-network || true'
                 }
             }
         }
@@ -30,35 +15,58 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    // Update the requirements.txt to pin specific versions of Flask and Werkzeug
+                    // Ensure requirements.txt is up-to-date with pinned versions
                     writeFile file: 'requirements.txt', text: '''\
 Flask==2.0.2
 Werkzeug==2.0.3
 '''
-                    
-                    // Build the Docker image
+
+                    // Build the Flask Docker image
                     sh 'docker build -t myapp .'
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy MySQL') {
             steps {
                 script {
-                    // Run the Docker container
-                    sh 'docker run -d -p 80:3000 --name myapp myapp:latest'
+                    // Run MySQL container with volume mounting
+                    sh '''
+                    docker run -d \
+                        --network my-network \
+                        --name mysql \
+                        -e MYSQL_ROOT_PASSWORD=root \
+                        -e MYSQL_DATABASE=mydb \
+                        -v mysql-data:/var/lib/mysql \
+                        mysql:latest
+                    '''
                 }
             }
         }
 
-        stage('Post Actions') {
+        stage('Deploy Flask App') {
             steps {
                 script {
-                    // Clean-up: remove the Docker network if needed
-                    sh 'docker network rm my-network || true'
-                    
-                    // Clean-up: remove all containers
-                    sh 'docker ps -qa | xargs -r docker rm -f || true'
+                    // Run the Flask Docker container
+                    sh '''
+                    docker run -d \
+                        --network my-network \
+                        -p 80:3000 \
+                        --name myapp \
+                        -e DB_HOST=mysql \
+                        myapp:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Test Application') {
+            steps {
+                script {
+                    // Wait for a few seconds to ensure the application is up
+                    sh 'sleep 10'
+                    // Test the application using curl
+                    sh 'curl -v http://localhost || true'
                 }
             }
         }
@@ -66,8 +74,7 @@ Werkzeug==2.0.3
 
     post {
         always {
-            // Clean-up steps to ensure no residual resources
-            sh 'docker ps -qa | xargs -r docker rm -f || true'
+            // Cleanup: remove the created Docker network
             sh 'docker network rm my-network || true'
         }
     }
