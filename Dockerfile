@@ -16,7 +16,7 @@ ENV YOUR_NAME=chris
 
 # Expose the correct port
 
-EXPOSE 5500
+EXPOSE 3000
 
 # Create an entrypoint
 
