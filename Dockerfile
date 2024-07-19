@@ -1,20 +1,23 @@
-# Use Python 3.6 as a base image
-FROM python:3.6-slim
+# Use Python 3.6 or later as a base image
 
-# Set the working directory
-WORKDIR /app
+FROM python:latest
 
-# Copy the current directory contents into the container
-COPY . /app
+# Copy contents into image
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . .  
 
-# Make port 80 available to the world outside this container
-EXPOSE 80
+# Install pip dependencies from requirements
 
-# Define environment variable
-ENV YOUR_NAME=Rachel
+RUN pip install -r requirements.txt
 
-# Run app.py when the container launches
-CMD ["python", "app.py"]
+# Set YOUR_NAME environment variable
+
+ENV YOUR_NAME=chris
+
+# Expose the correct port
+
+EXPOSE 5500
+
+# Create an entrypoint
+
+ENTRYPOINT ["python", "app.py"]
